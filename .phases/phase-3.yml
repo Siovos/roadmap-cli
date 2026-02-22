@@ -1,0 +1,59 @@
+id: '3'
+name: Documentation
+description: ''
+priority: 3
+status: done
+parent: null
+created_at: 2026-02-23
+updated_at: 2026-02-23
+workflow: null
+tasks:
+- id: '3.1'
+  name: README.md
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+- id: '3.2'
+  name: CLAUDE.md (instructions AI)
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+- id: '3.3'
+  name: Guide de démarrage
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+- id: '3.4'
+  name: Référence des commandes
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+- id: '3.5'
+  name: Format des données
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+- id: '3.6'
+  name: Exemples
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+notes: []

@@ -1,0 +1,32 @@
+project:
+  name: roadmap-cli
+  description: CLI pour gérer les roadmaps projet
+default_workflow:
+  enabled: true
+  stages:
+  - id: analysis
+    name: Analyse
+  - id: design
+    name: Conception
+  - id: implementation
+    name: Développement
+  - id: testing
+    name: Tests
+  - id: documentation
+    name: Documentation
+statuses:
+- id: pending
+  label: À faire
+  icon: ⬜
+- id: in_progress
+  label: En cours
+  icon: 🔄
+- id: done
+  label: Terminé
+  icon: ✅
+- id: blocked
+  label: Bloqué
+  icon: 🚫
+export:
+  roadmap_path: ./ROADMAP.md
+  phases_docs_path: ./docs

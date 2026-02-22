@@ -1,0 +1,69 @@
+id: '4'
+name: Distribution
+description: ''
+priority: 4
+status: in_progress
+parent: null
+created_at: 2026-02-23
+updated_at: 2026-02-23
+workflow: null
+tasks:
+- id: '4.1'
+  name: Build release
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+- id: '4.2'
+  name: Script d'installation
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+- id: '4.3'
+  name: GitHub Actions (CI/CD)
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+- id: '4.4'
+  name: Homebrew formula
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+- id: '4.5'
+  name: Créer repo GitHub
+  description: null
+  status: pending
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: null
+- id: '4.6'
+  name: Première release (v0.1.0)
+  description: null
+  status: pending
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: null
+- id: '4.7'
+  name: Créer homebrew-tap
+  description: null
+  status: pending
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: null
+notes:
+- date: 2026-02-23
+  content: Binaire 2.3 MB, installé localement

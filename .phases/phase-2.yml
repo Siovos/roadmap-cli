@@ -1,0 +1,53 @@
+id: '2'
+name: Interface & Formats
+description: ''
+priority: 2
+status: done
+parent: null
+created_at: 2026-02-23
+updated_at: 2026-02-23
+workflow: null
+tasks:
+- id: '2.1'
+  name: TUI interactif (ratatui)
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+- id: '2.2'
+  name: Sortie tableau (tabled)
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+- id: '2.3'
+  name: Sortie JSON
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+- id: '2.4'
+  name: Vue arborescente (tree)
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+- id: '2.5'
+  name: Rapport de progression
+  description: null
+  status: done
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: 2026-02-23
+notes:
+- date: 2026-02-23
+  content: TUI avec ratatui, tables avec tabled
