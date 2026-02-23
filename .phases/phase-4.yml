@@ -2,7 +2,7 @@ id: '4'
 name: Distribution
 description: ''
 priority: 4
-status: in_progress
+status: done
 parent: null
 created_at: 2026-02-23
 updated_at: 2026-02-23
@@ -43,19 +43,19 @@ tasks:
 - id: '4.5'
   name: Créer repo GitHub
   description: null
-  status: pending
+  status: done
   parent: null
   workflow_stage: null
   optional: false
-  completed_at: null
+  completed_at: 2026-02-23
 - id: '4.6'
   name: Première release (v0.1.0)
   description: null
-  status: pending
+  status: done
   parent: null
   workflow_stage: null
   optional: false
-  completed_at: null
+  completed_at: 2026-02-23
 - id: '4.7'
   name: Créer homebrew-tap
   description: null
