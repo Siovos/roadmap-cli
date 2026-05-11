@@ -19,7 +19,7 @@ brew tap siovos/tap
 brew install roadmap-cli
 
 # Script d'installation
-curl -fsSL https://raw.githubusercontent.com/siovos/roadmap-cli/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/siovos/roadmap-cli/master/install.sh | bash
 
 # Cargo (si Rust installé)
 cargo install --git https://github.com/siovos/roadmap-cli
