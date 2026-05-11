@@ -89,6 +89,9 @@ fn main() {
         Commands::Changelog { limit, from, to, format } => cmd_changelog(limit, from, to, format),
         Commands::Generate { what, output } => cmd_generate(what, output),
     }
+
+    // Silent update check (1x/day, cached, non-blocking)
+    update::check_update_hint();
 }
 
 fn cmd_login(server: String) {

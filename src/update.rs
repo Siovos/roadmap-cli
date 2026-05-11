@@ -223,6 +223,114 @@ pub fn perform_update() -> Result<(), String> {
     }
 }
 
+// ============================================================================
+// Version check cache (1x per day, non-blocking)
+// ============================================================================
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct VersionCache {
+    latest_version: String,
+    checked_at: i64,
+}
+
+fn cache_path() -> PathBuf {
+    let home = env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    PathBuf::from(home).join(".roadmap").join("version-check.json")
+}
+
+fn read_cache() -> Option<VersionCache> {
+    let path = cache_path();
+    let content = fs::read_to_string(path).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
+fn write_cache(latest: &str) {
+    let cache = VersionCache {
+        latest_version: latest.to_string(),
+        checked_at: chrono::Utc::now().timestamp(),
+    };
+    if let Ok(json) = serde_json::to_string(&cache) {
+        let path = cache_path();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).ok();
+        }
+        fs::write(path, json).ok();
+    }
+}
+
+fn cache_is_fresh() -> bool {
+    match read_cache() {
+        Some(cache) => {
+            let now = chrono::Utc::now().timestamp();
+            let age_hours = (now - cache.checked_at) / 3600;
+            age_hours < 24
+        }
+        None => false,
+    }
+}
+
+/// Check for updates silently (called at end of every command).
+/// Uses a 24h cache to avoid spamming GitHub API.
+/// Prints a one-liner hint if a new version is available.
+pub fn check_update_hint() {
+    // Read from cache if fresh
+    if let Some(cache) = read_cache() {
+        if cache_is_fresh() {
+            let current = match parse_version(CURRENT_VERSION) {
+                Ok(v) => v,
+                Err(_) => return,
+            };
+            let latest = match parse_version(&cache.latest_version) {
+                Ok(v) => v,
+                Err(_) => return,
+            };
+            if latest > current {
+                eprintln!(
+                    "\n{} Nouvelle version disponible: {} -> {} ({})",
+                    "hint:".dimmed(),
+                    CURRENT_VERSION.dimmed(),
+                    cache.latest_version.green(),
+                    "roadmap update".yellow()
+                );
+            }
+            return;
+        }
+    }
+
+    // Cache expired or missing — fetch and cache silently
+    // Runs synchronously but is fast (single HTTP GET, ~100-300ms)
+    // Only happens 1x per 24h
+    let handle = std::thread::spawn(|| {
+        fetch_latest_release().ok().map(|release| {
+            let tag = release.tag_name.strip_prefix('v').unwrap_or(&release.tag_name).to_string();
+            write_cache(&tag);
+            tag
+        })
+    });
+
+    // Wait for the check
+    let tag: Option<String> = handle.join().ok().flatten();
+    if let Some(tag) = tag {
+        let current = match parse_version(CURRENT_VERSION) {
+            Ok(v) => v,
+            Err(_) => return,
+        };
+        let latest = match parse_version(&tag) {
+            Ok(v) => v,
+            Err(_) => return,
+        };
+        if latest > current {
+            eprintln!(
+                "\n{} Nouvelle version disponible: {} -> {} ({})",
+                "hint:".dimmed(),
+                CURRENT_VERSION.dimmed(),
+                tag.green(),
+                "roadmap update".yellow()
+            );
+        }
+    }
+}
+
 /// Main entry point for update command
 pub fn cmd_update(check_only: bool) {
     if check_only {
