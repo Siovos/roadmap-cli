@@ -108,10 +108,17 @@ pub fn cmd_list(table: bool, json: bool, tag: Option<String>, status: Option<Str
     }
 }
 
-pub fn cmd_tree(json: bool) {
+pub fn cmd_tree(json: bool, not_done: bool) {
     let phases = match load_phases() {
         Some(p) => p,
         None => return,
+    };
+
+    // Filter out done phases if --not-done
+    let phases: Vec<_> = if not_done {
+        phases.into_iter().filter(|p| p.status != "done").collect()
+    } else {
+        phases
     };
 
     if phases.is_empty() {
@@ -137,17 +144,18 @@ pub fn cmd_tree(json: bool) {
             children: Vec<TreeNode>,
         }
 
-        fn build_task_tree(tasks: &[Task], parent: Option<&str>) -> Vec<TreeNode> {
+        fn build_task_tree(tasks: &[Task], parent: Option<&str>, not_done: bool) -> Vec<TreeNode> {
             tasks
                 .iter()
                 .filter(|t| t.parent.as_deref() == parent)
+                .filter(|t| !not_done || t.status != "done")
                 .map(|t| TreeNode {
                     id: t.id.clone(),
                     name: t.name.clone(),
                     node_type: if t.optional { "task_optional".to_string() } else { "task".to_string() },
                     status: t.status.clone(),
                     priority: None,
-                    children: build_task_tree(tasks, Some(&t.id)),
+                    children: build_task_tree(tasks, Some(&t.id), not_done),
                 })
                 .collect()
         }
@@ -167,11 +175,11 @@ pub fn cmd_tree(json: bool) {
                         node_type: "subphase".to_string(),
                         status: sp.status.clone(),
                         priority: Some(sp.priority),
-                        children: build_task_tree(&sp.tasks, None),
+                        children: build_task_tree(&sp.tasks, None, not_done),
                     })
                     .collect();
 
-                children.extend(build_task_tree(&phase.tasks, None));
+                children.extend(build_task_tree(&phase.tasks, None, not_done));
 
                 TreeNode {
                     id: phase.id.clone(),
@@ -216,7 +224,7 @@ pub fn cmd_tree(json: bool) {
             }
 
             let task_prefix = if is_last_phase { "    " } else { "│   " };
-            print_tree_tasks(&phase.tasks, None, task_prefix, &[]);
+            print_tree_tasks(&phase.tasks, None, task_prefix, &[], not_done);
         }
     }
 }
@@ -330,8 +338,11 @@ fn cmd_list_filtered(
     }
 }
 
-fn print_tree_tasks(tasks: &[Task], parent: Option<&str>, prefix: &str, parent_is_last: &[bool]) {
-    let filtered: Vec<_> = tasks.iter().filter(|t| t.parent.as_deref() == parent).collect();
+fn print_tree_tasks(tasks: &[Task], parent: Option<&str>, prefix: &str, parent_is_last: &[bool], not_done: bool) {
+    let filtered: Vec<_> = tasks.iter()
+        .filter(|t| t.parent.as_deref() == parent)
+        .filter(|t| !not_done || t.status != "done")
+        .collect();
 
     for (i, task) in filtered.iter().enumerate() {
         let is_last = i == filtered.len() - 1;
@@ -347,6 +358,6 @@ fn print_tree_tasks(tasks: &[Task], parent: Option<&str>, prefix: &str, parent_i
         let child_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
         let mut new_is_last = parent_is_last.to_vec();
         new_is_last.push(is_last);
-        print_tree_tasks(tasks, Some(&task.id), &child_prefix, &new_is_last);
+        print_tree_tasks(tasks, Some(&task.id), &child_prefix, &new_is_last, not_done);
     }
 }
