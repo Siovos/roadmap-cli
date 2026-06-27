@@ -4,6 +4,59 @@ use std::process::Command;
 use std::collections::HashMap;
 use colored::Colorize;
 use regex::Regex;
+use crate::utils::load_phases;
+
+/// Get the date (YYYY-MM-DD) of a git ref (tag or commit)
+fn git_ref_date(git_ref: &str) -> Option<String> {
+    let output = Command::new("git")
+        .args(["log", "-1", "--format=%aI", git_ref])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let date_str = String::from_utf8_lossy(&output.stdout);
+    // Extract YYYY-MM-DD from ISO date
+    date_str.trim().split('T').next().map(|s| s.to_string())
+}
+
+#[derive(Debug, serde::Serialize)]
+struct CompletedTask {
+    id: String,
+    name: String,
+    phase_id: String,
+    phase_name: String,
+    completed_at: String,
+}
+
+/// Collect tasks completed between two dates (exclusive from, inclusive to)
+fn completed_tasks_between(date_from: Option<&str>, date_to: Option<&str>) -> Vec<CompletedTask> {
+    let phases = match load_phases() {
+        Some(p) => p,
+        None => return Vec::new(),
+    };
+
+    let mut tasks = Vec::new();
+    for phase in &phases {
+        for task in &phase.tasks {
+            if let Some(ref completed) = task.completed_at {
+                let after_from = date_from.map_or(true, |d| completed.as_str() > d);
+                let before_to = date_to.map_or(true, |d| completed.as_str() <= d);
+                if after_from && before_to {
+                    tasks.push(CompletedTask {
+                        id: task.id.clone(),
+                        name: task.name.clone(),
+                        phase_id: phase.id.clone(),
+                        phase_name: phase.name.clone(),
+                        completed_at: completed.clone(),
+                    });
+                }
+            }
+        }
+    }
+    tasks.sort_by(|a, b| a.completed_at.cmp(&b.completed_at));
+    tasks
+}
 
 pub fn cmd_changelog(limit: usize, from: Option<String>, to: Option<String>, format: String) {
     let range = match (&from, &to) {
@@ -94,8 +147,17 @@ pub fn cmd_changelog(limit: usize, from: Option<String>, to: Option<String>, for
         });
     }
 
+    // Resolve tag dates and collect completed tasks
+    let date_from = from.as_ref().and_then(|r| git_ref_date(r));
+    let date_to = to.as_ref().and_then(|r| git_ref_date(r));
+    let completed = completed_tasks_between(date_from.as_deref(), date_to.as_deref());
+
     if format == "json" {
-        let json = serde_json::to_string_pretty(&commits).expect("Erreur JSON");
+        let output = serde_json::json!({
+            "commits": commits,
+            "completed_tasks": completed,
+        });
+        let json = serde_json::to_string_pretty(&output).expect("Erreur JSON");
         println!("{}", json);
         return;
     }
@@ -160,6 +222,29 @@ pub fn cmd_changelog(limit: usize, from: Option<String>, to: Option<String>, for
 
             let tag_badge = commit.tag.as_ref().map(|t| format!(" `{}`", t)).unwrap_or_default();
             println!("- {}{} ({})", commit.message, tag_badge, commit.short_hash);
+        }
+    }
+
+    // Completed tasks section
+    if !completed.is_empty() {
+        println!("\n## ✅ Tâches complétées\n");
+
+        // Group by phase
+        let mut by_phase: Vec<(String, String, Vec<&CompletedTask>)> = Vec::new();
+        for task in &completed {
+            if let Some(entry) = by_phase.iter_mut().find(|(id, _, _)| *id == task.phase_id) {
+                entry.2.push(task);
+            } else {
+                by_phase.push((task.phase_id.clone(), task.phase_name.clone(), vec![task]));
+            }
+        }
+
+        for (phase_id, phase_name, tasks) in &by_phase {
+            println!("### Phase {} — {}\n", phase_id, phase_name);
+            for task in tasks {
+                println!("- {} — {} ({})", task.id, task.name, task.completed_at);
+            }
+            println!();
         }
     }
 }
