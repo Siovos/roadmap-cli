@@ -93,3 +93,20 @@ pub fn find_phase<'a>(phases: &'a [Phase], id: &str) -> Option<&'a Phase> {
 pub fn today() -> String {
     chrono::Local::now().format("%Y-%m-%d").to_string()
 }
+
+/// Resolve the phase file for a task ID (e.g. "6.1.1" → "phase-6.1.yml" or "phase-6.yml")
+/// Tries progressively shorter prefixes: 6.1 then 6, returning the first match.
+/// Returns (phase_id, PathBuf) or None.
+pub fn resolve_phase_file(task_id: &str) -> Option<(String, std::path::PathBuf)> {
+    let phases_dir = Path::new(".phases");
+    let segments: Vec<&str> = task_id.split('.').collect();
+    // Try from longest prefix (all but last segment) down to first segment
+    for len in (1..segments.len()).rev() {
+        let candidate = segments[..len].join(".");
+        let path = phases_dir.join(format!("phase-{}.yml", candidate));
+        if path.exists() {
+            return Some((candidate, path));
+        }
+    }
+    None
+}

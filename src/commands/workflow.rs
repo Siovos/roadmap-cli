@@ -5,7 +5,7 @@ use std::path::Path;
 use colored::Colorize;
 use crate::config::Config;
 use crate::phase::{Phase, PhaseWorkflow, WorkflowStage};
-use crate::utils::today;
+use crate::utils::{today, resolve_phase_file};
 
 pub fn cmd_workflow(task_id: String, advance: bool, set: Option<String>) {
     if !advance && set.is_none() {
@@ -27,13 +27,13 @@ pub fn cmd_workflow(task_id: String, advance: bool, set: Option<String>) {
         return;
     }
 
-    let phase_id = task_id.split('.').next().unwrap();
-    let phase_file = phases_dir.join(format!("phase-{}.yml", phase_id));
-
-    if !phase_file.exists() {
-        println!("{} Phase {} non trouvée", "Erreur:".red(), phase_id.yellow());
-        return;
-    }
+    let (_phase_id, phase_file) = match resolve_phase_file(&task_id) {
+        Some(r) => r,
+        None => {
+            println!("{} Phase pour tâche {} non trouvée", "Erreur:".red(), task_id.yellow());
+            return;
+        }
+    };
 
     let content = fs::read_to_string(&phase_file).expect("Erreur lecture");
     let mut phase: Phase = serde_yaml::from_str(&content).expect("YAML invalide");
