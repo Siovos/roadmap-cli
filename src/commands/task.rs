@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 use colored::Colorize;
 use crate::phase::{Phase, Task};
-use crate::utils::today;
+use crate::utils::{today, resolve_phase_file};
 
 pub fn cmd_task_add(phase_id: String, name: String, description: Option<String>, parent: Option<String>, optional: bool, files: Option<Vec<String>>, tags: Option<Vec<String>>, assignee: Option<String>, due: Option<String>) {
     let phases_dir = Path::new(".phases");
@@ -52,8 +52,31 @@ pub fn cmd_task_add(phase_id: String, name: String, description: Option<String>,
         let count = phase.tasks.iter().filter(|t| t.parent.as_ref() == Some(parent_id)).count();
         format!("{}.{}", parent_id, count + 1)
     } else {
-        let count = phase.tasks.iter().filter(|t| t.parent.is_none()).count();
-        format!("{}.{}", phase_id, count + 1)
+        let existing_ids: Vec<&str> = phase.tasks.iter()
+            .filter(|t| t.parent.is_none())
+            .map(|t| t.id.as_str())
+            .collect();
+        let sub_phase_ids: Vec<String> = fs::read_dir(phases_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter_map(|e| {
+                let name = e.file_name().to_string_lossy().to_string();
+                if name.starts_with(&format!("phase-{}", phase_id)) && name.ends_with(".yml") {
+                    let id = name.trim_start_matches("phase-").trim_end_matches(".yml").to_string();
+                    if id != phase_id { Some(id) } else { None }
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let mut n = existing_ids.len() + 1;
+        loop {
+            let candidate = format!("{}.{}", phase_id, n);
+            if !existing_ids.contains(&candidate.as_str()) && !sub_phase_ids.contains(&candidate) {
+                break candidate;
+            }
+            n += 1;
+        }
     };
 
     let task = Task {
@@ -114,13 +137,13 @@ fn update_task_status(task_id: &str, new_status: &str) {
         return;
     }
 
-    let phase_id = task_id.split('.').next().unwrap();
-    let phase_file = phases_dir.join(format!("phase-{}.yml", phase_id));
-
-    if !phase_file.exists() {
-        println!("{} Phase {} non trouvée", "Erreur:".red(), phase_id.yellow());
-        return;
-    }
+    let (phase_id, phase_file) = match resolve_phase_file(task_id) {
+        Some(r) => r,
+        None => {
+            println!("{} Phase pour tâche {} non trouvée", "Erreur:".red(), task_id.yellow());
+            return;
+        }
+    };
 
     let content = match fs::read_to_string(&phase_file) {
         Ok(c) => c,
@@ -183,7 +206,6 @@ fn update_task_status(task_id: &str, new_status: &str) {
             .all(|t| t.status == "done");
 
         if all_done && !phase.tasks.is_empty() && phase.status != "done" {
-            // Re-read since we already wrote
             let content = fs::read_to_string(&phase_file).expect("Erreur lecture");
             let mut phase: Phase = serde_yaml::from_str(&content).expect("YAML invalide");
             let old_status = phase.status.clone();
@@ -230,13 +252,13 @@ pub fn cmd_task_edit(
         return;
     }
 
-    let phase_id = task_id.split('.').next().unwrap();
-    let phase_file = phases_dir.join(format!("phase-{}.yml", phase_id));
-
-    if !phase_file.exists() {
-        println!("{} Phase {} non trouvée", "Erreur:".red(), phase_id.yellow());
-        return;
-    }
+    let (_phase_id, phase_file) = match resolve_phase_file(&task_id) {
+        Some(r) => r,
+        None => {
+            println!("{} Phase pour tâche {} non trouvée", "Erreur:".red(), task_id.yellow());
+            return;
+        }
+    };
 
     let content = match fs::read_to_string(&phase_file) {
         Ok(c) => c,
@@ -325,18 +347,14 @@ pub fn cmd_task_move(task_id: String, to_phase: String) {
         return;
     }
 
-    let source_phase_id = task_id.split('.').next().unwrap();
-    let source_file = phases_dir.join(format!("phase-{}.yml", source_phase_id));
+    let (_source_phase_id, source_file) = match resolve_phase_file(&task_id) {
+        Some(r) => r,
+        None => {
+            println!("{} Phase pour tâche {} non trouvée", "Erreur:".red(), task_id.yellow());
+            return;
+        }
+    };
     let dest_file = phases_dir.join(format!("phase-{}.yml", to_phase));
-
-    if !source_file.exists() {
-        println!(
-            "{} Phase source {} non trouvée",
-            "Erreur:".red(),
-            source_phase_id.yellow()
-        );
-        return;
-    }
 
     if !dest_file.exists() {
         println!(
@@ -362,8 +380,31 @@ pub fn cmd_task_move(task_id: String, to_phase: String) {
     let dest_content = fs::read_to_string(&dest_file).expect("Erreur lecture");
     let mut dest_phase: Phase = serde_yaml::from_str(&dest_content).expect("YAML invalide");
 
-    let new_task_count = dest_phase.tasks.iter().filter(|t| t.parent.is_none()).count();
-    let new_task_id = format!("{}.{}", to_phase, new_task_count + 1);
+    let existing_dest_ids: Vec<&str> = dest_phase.tasks.iter()
+        .filter(|t| t.parent.is_none())
+        .map(|t| t.id.as_str())
+        .collect();
+    let dest_sub_phase_ids: Vec<String> = fs::read_dir(phases_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            if name.starts_with(&format!("phase-{}", to_phase)) && name.ends_with(".yml") {
+                let id = name.trim_start_matches("phase-").trim_end_matches(".yml").to_string();
+                if id != to_phase { Some(id) } else { None }
+            } else {
+                None
+            }
+        })
+        .collect();
+    let mut n = existing_dest_ids.len() + 1;
+    let new_task_id = loop {
+        let candidate = format!("{}.{}", to_phase, n);
+        if !existing_dest_ids.contains(&candidate.as_str()) && !dest_sub_phase_ids.contains(&candidate) {
+            break candidate;
+        }
+        n += 1;
+    };
 
     let new_task = Task {
         id: new_task_id.clone(),
@@ -415,14 +456,20 @@ pub fn cmd_task_blocks(task_id: String, blocked_id: String) {
         return;
     }
 
-    let task_phase_id = task_id.split('.').next().unwrap();
-    let blocked_phase_id = blocked_id.split('.').next().unwrap();
-
-    let task_phase_file = phases_dir.join(format!("phase-{}.yml", task_phase_id));
-    if !task_phase_file.exists() {
-        println!("{} Phase {} non trouvée", "Erreur:".red(), task_phase_id.yellow());
-        return;
-    }
+    let (task_phase_id, task_phase_file) = match resolve_phase_file(&task_id) {
+        Some(r) => r,
+        None => {
+            println!("{} Phase pour tâche {} non trouvée", "Erreur:".red(), task_id.yellow());
+            return;
+        }
+    };
+    let (blocked_phase_id, blocked_phase_file) = match resolve_phase_file(&blocked_id) {
+        Some(r) => r,
+        None => {
+            println!("{} Phase pour tâche {} non trouvée", "Erreur:".red(), blocked_id.yellow());
+            return;
+        }
+    };
 
     let content = fs::read_to_string(&task_phase_file).expect("Erreur lecture");
     let mut task_phase: Phase = serde_yaml::from_str(&content).expect("YAML invalide");
@@ -464,12 +511,6 @@ pub fn cmd_task_blocks(task_id: String, blocked_id: String) {
         let yaml = serde_yaml::to_string(&phase).expect("Erreur sérialisation");
         fs::write(&task_phase_file, yaml).expect("Erreur écriture");
     } else {
-        let blocked_phase_file = phases_dir.join(format!("phase-{}.yml", blocked_phase_id));
-        if !blocked_phase_file.exists() {
-            println!("{} Phase {} non trouvée", "Erreur:".red(), blocked_phase_id.yellow());
-            return;
-        }
-
         let content = fs::read_to_string(&blocked_phase_file).expect("Erreur lecture");
         let mut blocked_phase: Phase = serde_yaml::from_str(&content).expect("YAML invalide");
 
@@ -514,14 +555,20 @@ pub fn cmd_task_unblocks(task_id: String, blocked_id: String) {
         return;
     }
 
-    let task_phase_id = task_id.split('.').next().unwrap();
-    let blocked_phase_id = blocked_id.split('.').next().unwrap();
-
-    let task_phase_file = phases_dir.join(format!("phase-{}.yml", task_phase_id));
-    if !task_phase_file.exists() {
-        println!("{} Phase {} non trouvée", "Erreur:".red(), task_phase_id.yellow());
-        return;
-    }
+    let (task_phase_id, task_phase_file) = match resolve_phase_file(&task_id) {
+        Some(r) => r,
+        None => {
+            println!("{} Phase pour tâche {} non trouvée", "Erreur:".red(), task_id.yellow());
+            return;
+        }
+    };
+    let (blocked_phase_id, blocked_phase_file) = match resolve_phase_file(&blocked_id) {
+        Some(r) => r,
+        None => {
+            println!("{} Phase pour tâche {} non trouvée", "Erreur:".red(), blocked_id.yellow());
+            return;
+        }
+    };
 
     let content = fs::read_to_string(&task_phase_file).expect("Erreur lecture");
     let mut task_phase: Phase = serde_yaml::from_str(&content).expect("YAML invalide");
@@ -552,7 +599,6 @@ pub fn cmd_task_unblocks(task_id: String, blocked_id: String) {
         let yaml = serde_yaml::to_string(&phase).expect("Erreur sérialisation");
         fs::write(&task_phase_file, yaml).expect("Erreur écriture");
     } else {
-        let blocked_phase_file = phases_dir.join(format!("phase-{}.yml", blocked_phase_id));
         if blocked_phase_file.exists() {
             let content = fs::read_to_string(&blocked_phase_file).expect("Erreur lecture");
             let mut blocked_phase: Phase = serde_yaml::from_str(&content).expect("YAML invalide");
