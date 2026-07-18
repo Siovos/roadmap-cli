@@ -57,83 +57,61 @@ pub fn cmd_sync(glob_pattern: String, fix: bool, json: bool) {
     }
 
     // 3. Scan code for untracked TODO/FIXME
-    let glob_path = if glob_pattern.starts_with('/') || glob_pattern.starts_with('.') {
-        glob_pattern.clone()
-    } else {
-        format!("./{}", glob_pattern)
-    };
+    let pattern = glob::Pattern::new(&glob_pattern).expect("Invalid glob pattern");
 
-    // Match markers at the start of a comment line
     let markers = ["TODO", "FIXME", "HACK", "BUG"];
     let pattern_str = format!(r"(?:^|\s)(?://|#|/\*)\s*({})\b[:\s]*(.+?)$", markers.join("|"));
     let re = Regex::new(&pattern_str).expect("Invalid regex");
 
-    // Collect all known task names for matching
     let known: Vec<String> = phases
         .iter()
         .flat_map(|p| p.tasks.iter().map(|t| t.name.to_lowercase()))
         .collect();
 
-    if let Ok(entries) = glob::glob(&glob_path) {
-        for entry in entries.filter_map(|e| e.ok()) {
-            if !entry.is_file() {
-                continue;
-            }
+    let mut files = Vec::new();
+    walk_files(Path::new("."), &pattern, &mut files);
 
-            let path_str = entry.to_string_lossy();
-            if path_str.contains("/.") || path_str.contains("target/") {
-                continue;
-            }
+    for entry in files {
+        let path_str = entry.to_string_lossy().to_string();
+        let file = match std::fs::File::open(&entry) {
+            Ok(f) => f,
+            Err(_) => continue,
+        };
 
-            let ext = entry.extension().map(|e| e.to_string_lossy().to_lowercase());
-            let binary_exts = ["exe", "dll", "so", "dylib", "bin", "png", "jpg", "gif", "ico", "woff", "woff2", "ttf", "eot", "min.js"];
-            if let Some(ref e) = ext {
-                if binary_exts.contains(&e.as_str()) {
-                    continue;
-                }
-            }
+        let reader = BufReader::new(file);
 
-            let file = match std::fs::File::open(&entry) {
-                Ok(f) => f,
+        for (line_num, line_result) in reader.lines().enumerate() {
+            let line = match line_result {
+                Ok(l) => l,
                 Err(_) => continue,
             };
 
-            let reader = BufReader::new(file);
+            if let Some(captures) = re.captures(&line) {
+                let quote_count = line.matches('"').count();
+                if quote_count >= 2 {
+                    continue;
+                }
 
-            for (line_num, line_result) in reader.lines().enumerate() {
-                let line = match line_result {
-                    Ok(l) => l,
-                    Err(_) => continue,
-                };
+                let marker = captures.get(1).map(|m| m.as_str().to_uppercase()).unwrap_or_default();
+                let content = captures.get(2).map(|m| m.as_str().trim().to_string()).unwrap_or_default();
 
-                if let Some(captures) = re.captures(&line) {
-                    // Skip lines where the marker appears inside a string literal
-                    let quote_count = line.matches('"').count();
-                    if quote_count >= 2 {
-                        continue;
-                    }
+                if content.is_empty() || content.len() < 3 {
+                    continue;
+                }
 
-                    let marker = captures.get(1).map(|m| m.as_str().to_uppercase()).unwrap_or_default();
-                    let content = captures.get(2).map(|m| m.as_str().trim().to_string()).unwrap_or_default();
+                let content_lower = content.to_lowercase();
+                let is_tracked = known.iter().any(|k| {
+                    k.contains(&content_lower) || content_lower.contains(k.as_str())
+                });
 
-                    if content.is_empty() || content.len() < 3 {
-                        continue;
-                    }
-
-                    let content_lower = content.to_lowercase();
-                    let is_tracked = known.iter().any(|k| {
-                        k.contains(&content_lower) || content_lower.contains(k.as_str())
-                    });
-
-                    if !is_tracked {
-                        let short_file = path_str.strip_prefix("./").unwrap_or(&path_str);
-                        untracked_todos.push(serde_json::json!({
-                            "file": short_file,
-                            "line": line_num + 1,
-                            "marker": marker,
-                            "content": content,
-                        }));
-                    }
+                if !is_tracked {
+                    let short_file = path_str.strip_prefix("./").unwrap_or(&path_str);
+                    untracked_todos.push(serde_json::json!({
+                        "file": short_file,
+                        "line": line_num + 1,
+                        "marker": marker,
+                        "content": content,
+                    }));
                 }
             }
         }
@@ -224,6 +202,30 @@ pub fn cmd_sync(glob_pattern: String, fix: bool, json: bool) {
     if !has_issues {
         println!("  {} Code et roadmap synchronisés", "✅".green());
         println!();
+    }
+}
+
+fn walk_files(dir: &Path, pattern: &glob::Pattern, results: &mut Vec<std::path::PathBuf>) {
+    const SKIP_DIRS: &[&str] = &["target", "node_modules", ".git", "dist", "build", ".phases"];
+
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+
+        if path.is_dir() {
+            if name_str.starts_with('.') || SKIP_DIRS.contains(&name_str.as_ref()) {
+                continue;
+            }
+            walk_files(&path, pattern, results);
+        } else if pattern.matches_path(path.strip_prefix("./").unwrap_or(&path)) {
+            results.push(path);
+        }
     }
 }
 
