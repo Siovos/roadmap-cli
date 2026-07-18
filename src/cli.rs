@@ -70,7 +70,7 @@ pub enum Commands {
         json: bool,
         /// Masquer les phases et tâches terminées
         #[arg(long)]
-        not_done: bool,
+        hide_done: bool,
     },
     /// Afficher les détails d'une phase
     Show {
