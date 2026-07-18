@@ -107,10 +107,12 @@ pub fn perform_update() -> Result<(), String> {
         return Ok(());
     }
 
+    let latest_display = release.tag_name.strip_prefix('v').unwrap_or(&release.tag_name);
+
     println!(
         "Nouvelle version disponible: {} → {}",
         CURRENT_VERSION.dimmed(),
-        release.tag_name.green()
+        latest_display.green()
     );
 
     // Find the right asset for this platform
@@ -200,10 +202,13 @@ pub fn perform_update() -> Result<(), String> {
             // Remove backup
             fs::remove_file(&backup_path).ok();
 
+            // Update the version cache so the hint doesn't show stale info
+            write_cache(latest_display);
+
             println!(
                 "\n{} Mise à jour réussie ! Version {} installée.",
                 "✓".green(),
-                release.tag_name.green()
+                latest_display.green()
             );
             println!(
                 "  Relancez {} pour utiliser la nouvelle version.",
@@ -338,10 +343,11 @@ pub fn cmd_update(check_only: bool) {
 
         match check_for_update() {
             Ok(Some((version, url))) => {
+                let display = version.strip_prefix('v').unwrap_or(&version);
                 println!(
                     "\n{} Nouvelle version disponible: {}",
                     "→".yellow(),
-                    version.green()
+                    display.green()
                 );
                 println!("  Version actuelle: {}", CURRENT_VERSION);
                 println!("  Release: {}", url.cyan());
