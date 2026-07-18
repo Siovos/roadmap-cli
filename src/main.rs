@@ -72,7 +72,7 @@ fn main() {
         Commands::Workflow { task_id, advance, set } => cmd_workflow(task_id, advance, set),
         Commands::Ui => cmd_ui(),
         Commands::Serve { port, open } => cmd_serve(port, open),
-        Commands::Update { check } => update::cmd_update(check),
+        Commands::Update { check } => { update::cmd_update(check); return; },
         Commands::Next { json } => cmd_next(json),
         Commands::Context { include_done, phase } => cmd_context(include_done, phase),
         Commands::Search { query, json } => cmd_search(query, json),
