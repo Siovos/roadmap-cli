@@ -114,7 +114,6 @@ pub fn cmd_tree(json: bool, hide_done: bool) {
         None => return,
     };
 
-    // Filter out done phases if --not-done
     let phases: Vec<_> = if hide_done {
         phases.into_iter().filter(|p| p.status != "done").collect()
     } else {
