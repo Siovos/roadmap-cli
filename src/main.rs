@@ -31,7 +31,7 @@ fn main() {
         Commands::Add { id, name, parent, depends_on } => cmd_add(id, name, parent, depends_on),
         Commands::Edit { id, name, description, depends_on } => cmd_edit(id, name, description, depends_on),
         Commands::List { table, json, tag, status, assignee, overdue } => cmd_list(table, json, tag, status, assignee, overdue),
-        Commands::Tree { json } => cmd_tree(json),
+        Commands::Tree { json, not_done } => cmd_tree(json, not_done),
         Commands::Show { id, json } => cmd_show(id, json),
         Commands::Task { action } => match action {
             TaskCommands::Add { phase_id, name, description, parent, optional, files, tag, assignee, due } => {
