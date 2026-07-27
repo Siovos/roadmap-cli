@@ -42,15 +42,40 @@ roadmap add 9 "Observabilité"
 roadmap edit 9 --name "Observabilité & Infra"
 roadmap status 9 --set in_progress
 roadmap priority 9 --set 1
+roadmap remove 9                  # Supprimer (avec confirmation)
+roadmap remove 9 -y               # Supprimer sans confirmation
+roadmap remove 9 -y --force       # Forcer si sous-phases
 
 # Tâche
 roadmap task add 9 "Logs Pino"
+roadmap task add 9 "Métriques" --edit  # Ouvre $EDITOR pour la description
 roadmap task start 9.1
 roadmap task done 9.1
 roadmap task edit 9.1 --name "Logs structurés Pino"
+roadmap task remove 9.1               # Supprimer (avec confirmation)
+roadmap task remove 9.1 9.2 -y        # Supprimer plusieurs sans confirmation
+
+# Import en masse
+roadmap import 9 tasks.yml         # Depuis un fichier YAML
+cat tasks.yml | roadmap import 9 - # Depuis stdin
 
 # Note
 roadmap note 9 "Décision: utiliser Pino pour la performance"
+```
+
+### Format d'import YAML
+
+```yaml
+# Forme simple (nom seul)
+- "Setup CI"
+- "Tests unitaires"
+
+# Forme complète
+- name: "Deploy staging"
+  description: "Configurer le pipeline"
+  optional: true
+  tags: [backend, infra]
+  assignee: "dev-team"
 ```
 
 ### Sortie JSON (pour parsing)

@@ -141,6 +141,124 @@ pub fn cmd_priority(id: String, priority: u32) {
     );
 }
 
+pub fn cmd_phase_remove(id: String, skip_confirm: bool, force: bool) {
+    let phases_dir = Path::new(".phases");
+
+    if !phases_dir.exists() {
+        println!(
+            "{} Roadmap non initialisée. Lance d'abord: {}",
+            "Erreur:".red(),
+            "roadmap init".yellow()
+        );
+        return;
+    }
+
+    let phase_file = phases_dir.join(format!("phase-{}.yml", id));
+    if !phase_file.exists() {
+        println!("{} Phase {} non trouvée", "Erreur:".red(), id.yellow());
+        return;
+    }
+
+    let all_phases = match load_phases() {
+        Some(p) => p,
+        None => return,
+    };
+    let sub_phases: Vec<String> = all_phases
+        .iter()
+        .filter(|p| p.parent.as_deref() == Some(id.as_str()))
+        .map(|p| p.id.clone())
+        .collect();
+
+    if !sub_phases.is_empty() && !force {
+        println!(
+            "{} La phase {} a {} sous-phase(s): {}",
+            "Erreur:".red(),
+            id.yellow(),
+            sub_phases.len(),
+            sub_phases.join(", ").cyan()
+        );
+        println!(
+            "  Utilisez {} pour forcer la suppression",
+            "--force".yellow()
+        );
+        return;
+    }
+
+    let content = match fs::read_to_string(&phase_file) {
+        Ok(c) => c,
+        Err(e) => {
+            println!("{} {}", "Erreur:".red(), e);
+            return;
+        }
+    };
+
+    let phase: crate::phase::Phase = match serde_yaml::from_str(&content) {
+        Ok(p) => p,
+        Err(e) => {
+            println!("{} YAML invalide: {}", "Erreur:".red(), e);
+            return;
+        }
+    };
+
+    if !skip_confirm {
+        let task_count = phase.tasks.len();
+        if !sub_phases.is_empty() {
+            println!(
+                "Supprimer la phase {} ({}) avec {} tâche(s) et {} sous-phase(s) ? [y/N]",
+                id.cyan(),
+                phase.name,
+                task_count,
+                sub_phases.len()
+            );
+        } else if task_count > 0 {
+            println!(
+                "Supprimer la phase {} ({}) avec {} tâche(s) ? [y/N]",
+                id.cyan(),
+                phase.name,
+                task_count
+            );
+        } else {
+            println!(
+                "Supprimer la phase {} ({}) ? [y/N]",
+                id.cyan(),
+                phase.name
+            );
+        }
+
+        let mut input = String::new();
+        if std::io::stdin().read_line(&mut input).is_err() || !input.trim().eq_ignore_ascii_case("y") {
+            println!("{}", "Annulé".dimmed());
+            return;
+        }
+    }
+
+    if let Err(e) = fs::remove_file(&phase_file) {
+        println!("{} {}", "Erreur:".red(), e);
+        return;
+    }
+
+    let mut sub_removed = 0;
+    if force {
+        for sub_id in &sub_phases {
+            let sub_file = phases_dir.join(format!("phase-{}.yml", sub_id));
+            if fs::remove_file(&sub_file).is_ok() {
+                sub_removed += 1;
+            }
+        }
+    }
+
+    if sub_removed > 0 {
+        println!(
+            "{} Phase {} et {} sous-phase(s) supprimées",
+            "✓".green(),
+            id.cyan(),
+            sub_removed
+        );
+    } else {
+        println!("{} Phase {} supprimée", "✓".green(), id.cyan());
+    }
+}
+
 pub fn cmd_note(id: String, content: String) {
     let mut phases = match load_phases() {
         Some(p) => p,
