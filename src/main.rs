@@ -28,7 +28,7 @@ fn main() {
 
     match cli.command {
         Commands::Init => cmd_init(),
-        Commands::Add { id, name, parent, depends_on } => cmd_add(id, name, parent, depends_on),
+        Commands::Add { id, name, description, priority, status, parent, depends_on } => cmd_add(id, name, description, priority, status, parent, depends_on),
         Commands::Remove { id, yes, force } => cmd_phase_remove(id, yes, force),
         Commands::Import { phase_id, file } => cmd_import(phase_id, file),
         Commands::Edit { id, name, description, depends_on } => cmd_edit(id, name, description, depends_on),
@@ -67,9 +67,16 @@ fn main() {
             FeatureCommands::Implement { id, description, commit } => cmd_feature_implement(id, description, commit),
             FeatureCommands::Update { id, status, priority, assignee, title, description, phase } => cmd_feature_update(id, status, priority, assignee, title, description, phase),
         },
-        Commands::Priority { id, set } => cmd_priority(id, set),
+        Commands::Priority { id, value, set } => {
+            match value.or(set) {
+                Some(p) => cmd_priority(id, p),
+                None => {
+                    println!("{} Spécifie la priorité: {} ou {}", "Erreur:".red(), "roadmap priority <id> <valeur>".yellow(), "roadmap priority <id> --set <valeur>".yellow());
+                }
+            }
+        },
         Commands::Status { id, set } => cmd_status(id, set),
-        Commands::Note { id, content } => cmd_note(id, content),
+        Commands::Note { id, content, remove, edit, list } => cmd_note(id, content, remove, edit, list),
         Commands::Export => cmd_export(),
         Commands::Report { json } => cmd_report(json),
         Commands::Workflow { task_id, advance, set } => cmd_workflow(task_id, advance, set),

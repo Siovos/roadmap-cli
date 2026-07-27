@@ -38,10 +38,11 @@ roadmap show 9
 
 ```bash
 # Phase
-roadmap add 9 "Observabilité"
+roadmap add 9 "Observabilité" --description "..." --priority 1 --status in_progress
 roadmap edit 9 --name "Observabilité & Infra"
 roadmap status 9 --set in_progress
-roadmap priority 9 --set 1
+roadmap priority 9 1              # Deux positionnels (plus naturel)
+roadmap priority 9 --set 1        # Ou avec --set (compatible)
 roadmap remove 9                  # Supprimer (avec confirmation)
 roadmap remove 9 -y               # Supprimer sans confirmation
 roadmap remove 9 -y --force       # Forcer si sous-phases
@@ -59,8 +60,11 @@ roadmap task remove 9.1 9.2 -y        # Supprimer plusieurs sans confirmation
 roadmap import 9 tasks.yml         # Depuis un fichier YAML
 cat tasks.yml | roadmap import 9 - # Depuis stdin
 
-# Note
-roadmap note 9 "Décision: utiliser Pino pour la performance"
+# Notes
+roadmap note 9 "Décision: utiliser Pino"  # Ajouter
+roadmap note 9 --list                     # Lister avec index
+roadmap note 9 "Corrigé" --edit 2         # Éditer par index
+roadmap note 9 --remove 1                 # Supprimer par index
 ```
 
 ### Format d'import YAML
