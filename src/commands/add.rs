@@ -6,7 +6,7 @@ use colored::Colorize;
 use crate::phase::Phase;
 use crate::utils::{load_phases, save_phase, today};
 
-pub fn cmd_add(id: String, name: String, parent: Option<String>, depends_on: Option<Vec<String>>) {
+pub fn cmd_add(id: String, name: String, description: Option<String>, priority: Option<u32>, status: Option<String>, parent: Option<String>, depends_on: Option<Vec<String>>) {
     let phases_dir = Path::new(".phases");
 
     if !phases_dir.exists() {
@@ -41,6 +41,15 @@ pub fn cmd_add(id: String, name: String, parent: Option<String>, depends_on: Opt
     }
 
     let mut phase = Phase::new(id.clone(), name.clone());
+    if let Some(desc) = description {
+        phase.description = desc;
+    }
+    if let Some(prio) = priority {
+        phase.priority = prio;
+    }
+    if let Some(st) = status {
+        phase.status = st;
+    }
     phase.parent = parent.clone();
     phase.depends_on = depends_on.unwrap_or_default();
 
@@ -259,7 +268,7 @@ pub fn cmd_phase_remove(id: String, skip_confirm: bool, force: bool) {
     }
 }
 
-pub fn cmd_note(id: String, content: String) {
+pub fn cmd_note(id: String, content: Option<String>, remove: Option<usize>, edit: Option<usize>, list: bool) {
     let mut phases = match load_phases() {
         Some(p) => p,
         None => return,
@@ -273,16 +282,111 @@ pub fn cmd_note(id: String, content: String) {
         }
     };
 
-    phase.notes.push(crate::phase::Note {
-        date: today(),
-        content: content.clone(),
-    });
-    phase.updated_at = today();
-
-    if let Err(e) = save_phase(phase) {
-        println!("{} {}", "Erreur:".red(), e);
+    if list {
+        if phase.notes.is_empty() {
+            println!("{} Aucune note pour la phase {}", "ℹ".dimmed(), id.cyan());
+        } else {
+            println!("Notes de la phase {} :", id.cyan());
+            for (i, note) in phase.notes.iter().enumerate() {
+                println!("  {} [{}] {}", (i + 1).to_string().cyan(), note.date.dimmed(), note.content);
+            }
+        }
         return;
     }
 
-    println!("{} Note ajoutée à {}", "✓".green(), id.cyan());
+    if let Some(index) = remove {
+        if index == 0 || index > phase.notes.len() {
+            println!(
+                "{} Index {} invalide (la phase a {} note(s))",
+                "Erreur:".red(),
+                index,
+                phase.notes.len()
+            );
+            return;
+        }
+        let removed = phase.notes.remove(index - 1);
+        phase.updated_at = today();
+
+        if let Err(e) = save_phase(phase) {
+            println!("{} {}", "Erreur:".red(), e);
+            return;
+        }
+
+        println!(
+            "{} Note #{} supprimée de {} (\"{}\")",
+            "✓".green(),
+            index,
+            id.cyan(),
+            if removed.content.chars().count() > 40 {
+                let truncated: String = removed.content.chars().take(37).collect();
+                format!("{}...", truncated)
+            } else {
+                removed.content
+            }
+        );
+        return;
+    }
+
+    if let Some(index) = edit {
+        if index == 0 || index > phase.notes.len() {
+            println!(
+                "{} Index {} invalide (la phase a {} note(s))",
+                "Erreur:".red(),
+                index,
+                phase.notes.len()
+            );
+            return;
+        }
+
+        let new_content = match content {
+            Some(c) => c,
+            None => {
+                println!(
+                    "{} Spécifie le nouveau contenu: {}",
+                    "Erreur:".red(),
+                    format!("roadmap note {} \"nouveau contenu\" --edit {}", id, index).yellow()
+                );
+                return;
+            }
+        };
+
+        phase.notes[index - 1].content = new_content;
+        phase.notes[index - 1].date = today();
+        phase.updated_at = today();
+
+        if let Err(e) = save_phase(phase) {
+            println!("{} {}", "Erreur:".red(), e);
+            return;
+        }
+
+        println!("{} Note #{} de {} modifiée", "✓".green(), index, id.cyan());
+        return;
+    }
+
+    match content {
+        Some(text) => {
+            phase.notes.push(crate::phase::Note {
+                date: today(),
+                content: text,
+            });
+            phase.updated_at = today();
+
+            if let Err(e) = save_phase(phase) {
+                println!("{} {}", "Erreur:".red(), e);
+                return;
+            }
+
+            println!("{} Note ajoutée à {}", "✓".green(), id.cyan());
+        }
+        None => {
+            if phase.notes.is_empty() {
+                println!("{} Aucune note pour la phase {}", "ℹ".dimmed(), id.cyan());
+            } else {
+                println!("Notes de la phase {} :", id.cyan());
+                for (i, note) in phase.notes.iter().enumerate() {
+                    println!("  {} [{}] {}", (i + 1).to_string().cyan(), note.date.dimmed(), note.content);
+                }
+            }
+        }
+    }
 }

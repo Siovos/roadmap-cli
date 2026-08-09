@@ -21,6 +21,15 @@ pub enum Commands {
         id: String,
         /// Nom de la phase
         name: String,
+        /// Description de la phase
+        #[arg(long, alias = "desc")]
+        description: Option<String>,
+        /// Priorité (1 = haute, défaut: 10)
+        #[arg(long, short)]
+        priority: Option<u32>,
+        /// Statut initial (pending, in_progress, done, blocked)
+        #[arg(long)]
+        status: Option<String>,
         /// Phase parente (pour les sous-phases)
         #[arg(long)]
         parent: Option<String>,
@@ -118,8 +127,10 @@ pub enum Commands {
         /// ID de la phase
         id: String,
         /// Nouvelle priorité (1 = haute)
+        value: Option<u32>,
+        /// Nouvelle priorité (alias --set pour compatibilité)
         #[arg(long)]
-        set: u32,
+        set: Option<u32>,
     },
     /// Changer le statut d'une phase
     Status {
@@ -129,12 +140,21 @@ pub enum Commands {
         #[arg(long)]
         set: String,
     },
-    /// Ajouter une note à une phase
+    /// Gérer les notes d'une phase
     Note {
         /// ID de la phase
         id: String,
-        /// Contenu de la note
-        content: String,
+        /// Contenu de la note (ajout)
+        content: Option<String>,
+        /// Supprimer la note à cet index (1-based)
+        #[arg(long)]
+        remove: Option<usize>,
+        /// Éditer la note à cet index (1-based, contenu en argument positionnel)
+        #[arg(long)]
+        edit: Option<usize>,
+        /// Lister les notes avec leurs index
+        #[arg(long)]
+        list: bool,
     },
     /// Générer les fichiers Markdown
     Export,
@@ -335,7 +355,7 @@ pub enum TaskCommands {
         /// Marquer comme optionnelle
         #[arg(long)]
         optional: bool,
-        /// Fichiers liés à cette tâche
+        /// Fichiers liés (chemins séparés par des virgules)
         #[arg(long, value_delimiter = ',')]
         files: Option<Vec<String>>,
         /// Tags/labels pour catégoriser la tâche
