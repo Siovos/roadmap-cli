@@ -317,8 +317,9 @@ pub fn cmd_note(id: String, content: Option<String>, remove: Option<usize>, edit
             "✓".green(),
             index,
             id.cyan(),
-            if removed.content.len() > 40 {
-                format!("{}...", &removed.content[..37])
+            if removed.content.chars().count() > 40 {
+                let truncated: String = removed.content.chars().take(37).collect();
+                format!("{}...", truncated)
             } else {
                 removed.content
             }
