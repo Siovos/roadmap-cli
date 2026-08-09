@@ -6,7 +6,7 @@ use colored::Colorize;
 use crate::phase::{Phase, Task};
 use crate::utils::{today, resolve_phase_file};
 
-pub fn cmd_task_add(phase_id: String, name: String, description: Option<String>, parent: Option<String>, optional: bool, files: Option<Vec<String>>, tags: Option<Vec<String>>, assignee: Option<String>, due: Option<String>) {
+pub fn cmd_task_add(phase_id: String, name: String, description: Option<String>, edit: bool, parent: Option<String>, optional: bool, files: Option<Vec<String>>, tags: Option<Vec<String>>, assignee: Option<String>, due: Option<String>) {
     let phases_dir = Path::new(".phases");
 
     if !phases_dir.exists() {
@@ -77,6 +77,19 @@ pub fn cmd_task_add(phase_id: String, name: String, description: Option<String>,
             }
             n += 1;
         }
+    };
+
+    let description = if edit {
+        match open_editor_for_description(&name, description.as_deref()) {
+            Some(desc) if !desc.is_empty() => Some(desc),
+            Some(_) => None,
+            None => {
+                println!("{} Édition annulée", "✗".red());
+                return;
+            }
+        }
+    } else {
+        description
     };
 
     let task = Task {
@@ -622,4 +635,195 @@ pub fn cmd_task_unblocks(task_id: String, blocked_id: String) {
         task_id.cyan(),
         blocked_id.cyan()
     );
+}
+
+pub fn cmd_task_remove(task_ids: Vec<String>, skip_confirm: bool) {
+    let phases_dir = Path::new(".phases");
+
+    if !phases_dir.exists() {
+        println!(
+            "{} Roadmap non initialisée. Lance d'abord: {}",
+            "Erreur:".red(),
+            "roadmap init".yellow()
+        );
+        return;
+    }
+
+    for task_id in &task_ids {
+        let (_phase_id, phase_file) = match resolve_phase_file(task_id) {
+            Some(r) => r,
+            None => {
+                println!("{} Phase pour tâche {} non trouvée", "Erreur:".red(), task_id.yellow());
+                continue;
+            }
+        };
+
+        let content = match fs::read_to_string(&phase_file) {
+            Ok(c) => c,
+            Err(e) => {
+                println!("{} {}", "Erreur:".red(), e);
+                continue;
+            }
+        };
+
+        let mut phase: Phase = match serde_yaml::from_str(&content) {
+            Ok(p) => p,
+            Err(e) => {
+                println!("{} YAML invalide: {}", "Erreur:".red(), e);
+                continue;
+            }
+        };
+
+        let task = match phase.tasks.iter().find(|t| t.id == *task_id) {
+            Some(t) => t,
+            None => {
+                println!("{} Tâche {} non trouvée", "Erreur:".red(), task_id.yellow());
+                continue;
+            }
+        };
+
+        let has_children = phase.tasks.iter().any(|t| t.parent.as_deref() == Some(task_id));
+        let child_count = phase.tasks.iter().filter(|t| t.parent.as_deref() == Some(task_id)).count();
+
+        if !skip_confirm {
+            if has_children {
+                println!(
+                    "Supprimer {} ({}) et ses {} sous-tâche(s) ? [y/N]",
+                    task_id.cyan(),
+                    task.name,
+                    child_count
+                );
+            } else {
+                println!(
+                    "Supprimer {} ({}) ? [y/N]",
+                    task_id.cyan(),
+                    task.name
+                );
+            }
+
+            let mut input = String::new();
+            if std::io::stdin().read_line(&mut input).is_err() || !input.trim().eq_ignore_ascii_case("y") {
+                println!("{}", "Annulé".dimmed());
+                continue;
+            }
+        }
+
+        let removed_ids: Vec<String> = if has_children {
+            let mut ids = vec![task_id.clone()];
+            collect_child_ids(&phase.tasks, task_id, &mut ids);
+            ids
+        } else {
+            vec![task_id.clone()]
+        };
+
+        let blocks_to_clean: Vec<(String, Vec<String>)> = phase.tasks.iter()
+            .filter(|t| removed_ids.contains(&t.id))
+            .flat_map(|t| {
+                t.blocks.iter().map(|b| (b.clone(), vec![t.id.clone()]))
+            })
+            .collect();
+
+        phase.tasks.retain(|t| !removed_ids.contains(&t.id));
+
+        for task in &mut phase.tasks {
+            task.blocked_by.retain(|id| !removed_ids.contains(id));
+            task.blocks.retain(|id| !removed_ids.contains(id));
+        }
+
+        phase.updated_at = today();
+
+        let yaml = serde_yaml::to_string(&phase).expect("Erreur sérialisation");
+        if let Err(e) = fs::write(&phase_file, yaml) {
+            println!("{} {}", "Erreur:".red(), e);
+            continue;
+        }
+
+        // Clean blocked_by references in other phase files
+        for (blocked_id, blocker_ids) in &blocks_to_clean {
+            if let Some((_, other_file)) = resolve_phase_file(blocked_id) {
+                if other_file != phase_file {
+                    if let Ok(c) = fs::read_to_string(&other_file) {
+                        if let Ok(mut other_phase) = serde_yaml::from_str::<Phase>(&c) {
+                            let mut changed = false;
+                            for t in &mut other_phase.tasks {
+                                if t.id == *blocked_id {
+                                    let before = t.blocked_by.len();
+                                    t.blocked_by.retain(|id| !blocker_ids.contains(id));
+                                    if t.blocked_by.len() != before {
+                                        changed = true;
+                                    }
+                                }
+                            }
+                            if changed {
+                                other_phase.updated_at = today();
+                                let y = serde_yaml::to_string(&other_phase).expect("Erreur sérialisation");
+                                fs::write(&other_file, y).ok();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if removed_ids.len() > 1 {
+            println!(
+                "{} Tâche {} et {} sous-tâche(s) supprimées",
+                "✓".green(),
+                task_id.cyan(),
+                removed_ids.len() - 1
+            );
+        } else {
+            println!("{} Tâche {} supprimée", "✓".green(), task_id.cyan());
+        }
+    }
+}
+
+fn collect_child_ids(tasks: &[Task], parent_id: &str, ids: &mut Vec<String>) {
+    for task in tasks {
+        if task.parent.as_deref() == Some(parent_id) {
+            ids.push(task.id.clone());
+            collect_child_ids(tasks, &task.id, ids);
+        }
+    }
+}
+
+fn open_editor_for_description(name: &str, existing: Option<&str>) -> Option<String> {
+    let editor = std::env::var("EDITOR")
+        .or_else(|_| std::env::var("VISUAL"))
+        .unwrap_or_else(|_| "vi".to_string());
+
+    let template = format!(
+        "# Description pour: {}\n# Les lignes commençant par # seront ignorées.\n# Sauvegardez et quittez pour valider, fichier vide pour annuler.\n\n{}",
+        name,
+        existing.unwrap_or("")
+    );
+
+    let tmp = match tempfile::Builder::new().suffix(".md").tempfile() {
+        Ok(f) => f,
+        Err(_) => return None,
+    };
+
+    if fs::write(tmp.path(), &template).is_err() {
+        return None;
+    }
+
+    let status = std::process::Command::new(&editor)
+        .arg(tmp.path())
+        .status();
+
+    match status {
+        Ok(s) if s.success() => {}
+        _ => return None,
+    }
+
+    let content = fs::read_to_string(tmp.path()).ok()?;
+    let result: String = content
+        .lines()
+        .filter(|l| !l.starts_with('#'))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string();
+
+    Some(result)
 }

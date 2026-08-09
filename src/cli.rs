@@ -28,6 +28,24 @@ pub enum Commands {
         #[arg(long)]
         depends_on: Option<Vec<String>>,
     },
+    /// Supprimer une phase
+    Remove {
+        /// ID de la phase à supprimer
+        id: String,
+        /// Supprimer sans confirmation
+        #[arg(long, short = 'y')]
+        yes: bool,
+        /// Forcer la suppression même si la phase a des sous-phases
+        #[arg(long)]
+        force: bool,
+    },
+    /// Importer des tâches en masse depuis un fichier YAML
+    Import {
+        /// ID de la phase cible
+        phase_id: String,
+        /// Fichier YAML source (- pour stdin)
+        file: String,
+    },
     /// Modifier une phase
     Edit {
         /// ID de la phase
@@ -308,6 +326,9 @@ pub enum TaskCommands {
         /// Description détaillée
         #[arg(long, alias = "desc")]
         description: Option<String>,
+        /// Ouvrir $EDITOR pour la description (évite le quoting shell)
+        #[arg(long, short)]
+        edit: bool,
         /// Tâche parente (pour les sous-tâches)
         #[arg(long)]
         parent: Option<String>,
@@ -336,6 +357,14 @@ pub enum TaskCommands {
     Start {
         /// IDs des tâches (ex: 9.1 9.2)
         task_ids: Vec<String>,
+    },
+    /// Supprimer une tâche
+    Remove {
+        /// IDs des tâches à supprimer (ex: 9.1 9.2)
+        task_ids: Vec<String>,
+        /// Supprimer sans confirmation
+        #[arg(long, short = 'y')]
+        yes: bool,
     },
     /// Modifier une tâche
     Edit {

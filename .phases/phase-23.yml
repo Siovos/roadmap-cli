@@ -1,0 +1,45 @@
+id: '23'
+name: Ergonomie CLI — Quick Wins
+description: 'Irritants d''ergonomie CLI identifiés par retour utilisateur v0.3.3 : arguments, flags manquants, notes, documentation.'
+priority: 2
+status: pending
+parent: null
+created_at: 2026-07-27
+updated_at: 2026-07-27
+workflow: null
+tasks:
+- id: '23.1'
+  name: 'priority accepte deux positionnels : roadmap priority 48 2'
+  description: null
+  status: pending
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: null
+- id: '23.2'
+  name: add accepte --description --priority --status a la creation
+  description: null
+  status: pending
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: null
+- id: '23.3'
+  name: 'note remove/edit : suppression et edition de notes'
+  description: null
+  status: pending
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: null
+- id: '23.4'
+  name: Documenter --files (comma-separated) dans le --help
+  description: null
+  status: pending
+  parent: null
+  workflow_stage: null
+  optional: false
+  completed_at: null
+notes:
+- date: 2026-07-27
+  content: 'Retour utilisateur terrain v0.3.3 : irritants d''ergonomie, quick wins a intercaler'

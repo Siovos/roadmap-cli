@@ -29,14 +29,17 @@ fn main() {
     match cli.command {
         Commands::Init => cmd_init(),
         Commands::Add { id, name, parent, depends_on } => cmd_add(id, name, parent, depends_on),
+        Commands::Remove { id, yes, force } => cmd_phase_remove(id, yes, force),
+        Commands::Import { phase_id, file } => cmd_import(phase_id, file),
         Commands::Edit { id, name, description, depends_on } => cmd_edit(id, name, description, depends_on),
         Commands::List { table, json, tag, status, assignee, overdue } => cmd_list(table, json, tag, status, assignee, overdue),
         Commands::Tree { json, hide_done } => cmd_tree(json, hide_done),
         Commands::Show { id, json } => cmd_show(id, json),
         Commands::Task { action } => match action {
-            TaskCommands::Add { phase_id, name, description, parent, optional, files, tag, assignee, due } => {
-                cmd_task_add(phase_id, name, description, parent, optional, files, tag, assignee, due)
+            TaskCommands::Add { phase_id, name, description, edit, parent, optional, files, tag, assignee, due } => {
+                cmd_task_add(phase_id, name, description, edit, parent, optional, files, tag, assignee, due)
             }
+            TaskCommands::Remove { task_ids, yes } => cmd_task_remove(task_ids, yes),
             TaskCommands::Done { task_ids } => cmd_task_done(task_ids),
             TaskCommands::Start { task_ids } => cmd_task_start(task_ids),
             TaskCommands::Edit { task_id, name, description, optional, files, tag, assignee, due } => {

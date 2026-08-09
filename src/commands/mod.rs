@@ -23,13 +23,15 @@ pub mod search;
 pub mod bug;
 pub mod feature;
 pub mod generate;
+pub mod import;
 
 // Re-export all command functions for convenience
 pub use init::cmd_init;
-pub use add::{cmd_add, cmd_edit, cmd_priority, cmd_note};
+pub use add::{cmd_add, cmd_edit, cmd_priority, cmd_note, cmd_phase_remove};
 pub use list::{cmd_list, cmd_tree};
 pub use show::cmd_show;
-pub use task::{cmd_task_add, cmd_task_done, cmd_task_start, cmd_task_edit, cmd_task_move, cmd_task_blocks, cmd_task_unblocks};
+pub use task::{cmd_task_add, cmd_task_done, cmd_task_start, cmd_task_edit, cmd_task_move, cmd_task_blocks, cmd_task_unblocks, cmd_task_remove};
+pub use import::cmd_import;
 pub use status::cmd_status;
 pub use export::cmd_export;
 pub use report::cmd_report;
